@@ -156,4 +156,71 @@ router.post('/pdf2',function (req,res) {
 //     }
 //   });
 // });
+
+router.post('/pdf1',function (req,res,next) {
+  var db=req.connection;
+  var idArray= new Array();
+  var a=req.body['notedata['+0+'][id]'];
+  var question=new Array();
+  var answer=new Array();
+  var num=0;
+  //var b=JSON.parse(a);
+  for(var i in req.body)
+  {
+    console.log(i);
+    idArray[num]=req.body['notedata['+ num +'][id]'];
+    num++;
+  }
+  //console.log(a);
+  console.log(idArray);
+  var sql='SELECT question,answer from note where id in ('+ idArray +')';
+  db.query(sql,function(err,row) {
+    if (err)
+      console.log("錯誤警告" + err);
+    else {
+      for (var i in row) {
+        question[i] = row[i].question;
+        answer[i] = row[i].answer;
+      }
+
+      console.log(question);
+      console.log(answer);
+
+      //var json = fs.readFileSync('C:\\Users\\user\\IdeaProjects\\note-server\\bookstore.json', 'utf8');
+      //var obj = JSON.parse(json);
+      var htmlStart = '<html><body>';
+      var htmlEnd = '</body></html>';
+
+      var htmlquestion = '';
+      var num=1;
+      for(var i in question){
+        htmlquestion += '<hr>'
+            + '<h3>' + num + '.&nbsp;' + question[i] + '</h3><br>';
+        num += 1;
+      }
+      var htmlanswer = '';
+      var num2=1;
+      for(var i in answer){
+        htmlanswer += '<hr>'
+            + '<h3>' + num2 + '.&nbsp;' + answer[i] + '</h3><br>';
+        num2 += 1;
+      }
+      var html = htmlStart + htmlquestion + htmlanswer + htmlEnd;
+      console.log(html);
+      var pdfOptions = {format: 'Letter'};
+
+      pdf.create(html, pdfOptions).toFile('./note.pdf', function (err, result) {
+        if (err) {
+          console.log('error in pdf.create(), err=', err);
+          res.send(err);
+        } else {
+          console.log('result=', result);
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Access-Control-Allow-Origin','*');
+          res.download('./note.pdf');
+        }
+      });
+    }
+  });
+});
 module.exports = router;
