@@ -9,32 +9,63 @@ var app = express();
 var formidable = require('formidable');
 var sd = require('silly-datetime');
 var multer1  = require('multer');
-const vision = require('@google-cloud/vision');
 var pdf = require('html-pdf');
 var fs = require('fs');
 
 var routes = require('./routes/index');
 var usersRouter = require('./routes/users');
 var login = require('./routes/login');
-var mysql = require('mysql');
+// var mysql = require('mysql');
 
-var connection = mysql.createConnection({
-  host     : '35.213.23.117',
-  port     : '3306',
-  user     : 'root',
-  password : '205025',
-  database : 'Notebook'
-});
+// var connection = mysql.createConnection({
+//   host     : '35.213.23.117',
+//   port     : '3306',
+//   user     : 'Andrew',
+//   password : 'Andrew93220@',
+//   database : 'Notebook'
+// });
 
 
 //連接資料庫
-connection.connect(function(err) {
-  if (err) {
-    console.log('connecting error');
-    return;
-  }
-  console.log('connecting success');
-});
+// connection.connect(function(err) {
+//   if (err) {
+//     console.log('connecting error '+ err);
+//     return;
+//   }
+//   console.log('connecting success');
+// });
+
+var mysql = require('mysql');
+var mysql_config={
+  host     : '35.206.219.27',
+  port     : '3306',
+  user     : 'Andrew',
+  password : 'Andrew93220@',
+  database : 'Notebook'
+};
+var connection;
+function handleDisconnection() {
+  connection = mysql.createConnection(mysql_config);
+  connection.connect(function(err) {
+    if(err) {
+      setInterval(handleDisconnection, 2000);
+    }
+    else{
+      console.log('connecting success');
+    }
+  });
+  connection.on('error', function(err) {
+    if(err.code === 'PROTOCOL_CONNECTION_LOST') {
+      handleDisconnection();
+    }
+    else {
+      throw err;
+    }
+  });
+};
+
+handleDisconnection()
+
 
 app.use(logger('dev'));
 app.use(express.json({limit:"2100000kb"}));
@@ -42,7 +73,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(bodyParser.json({limit:"2100000kb"}));
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/',login);
 
 app.post('/',function(req,res,next){
@@ -63,6 +94,7 @@ app.post('/',function(req,res,next){
   })
 });
 
+
 app.use(function(req, res, next) {
   req.connection = connection;
   next();
@@ -71,6 +103,8 @@ app.use(function(req, res, next) {
 
 app.use('/routes',routes);
 app.use('/users', usersRouter);
+
+
 
 var storage = multer1.diskStorage({
   //儲存的位址，會儲存在uploads的目錄裡
@@ -83,62 +117,72 @@ var storage = multer1.diskStorage({
   }
 });
 
-
 var upload = multer1({ storage: storage });
-
 
 //單圖上傳
 //upload.single('file')的file盡量跟<input>的name一致
-app.post('/uploads', upload.array('file',3), function(req, res,next){
-  var file = new Array(3);
-  var url = new Array(3);
-  for(var i=0;i<3;i++)
-  {
-    file[i]=req.files[i];
-    if(!file[i])
-      url[i]=" ";
-    else
-      url[i]='http://35.213.23.117/database/uploads'+file[i].filename;
-  }
-  var sql = {
-    picture1:url[0],
-    picture2:url[1],
-    picture3:url[2]
-  };
-  console.log(url);
-  // language=SQL format=false
-connection.query("UPDATE note SET ? WHERE id = 16",sql,function(error,results,fields){
+app.post('/uploads', function(req, res,next){
+  let data_url = req.body.baseimg;
+//var buff = new Buffer.from(data_url.replace(/^data:image\/(png|gif|jpeg);base64,/,''), 'base64');
+
+  let matches = data_url.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/),
+      response = {};
+  let current_datetime = new Date();
+  let formatted_date = current_datetime.getFullYear() + "-" + (current_datetime.getMonth() + 1) + "-" + current_datetime.getDate() + "-" + current_datetime.getHours() + "-" + current_datetime.getMinutes() + "-" + current_datetime.getSeconds();
+  let dateString = formatted_date.toString();
+  response.type = matches[1];
+  response.data = new Buffer.from(matches[2], 'base64');
+  console.log(dateString);
+  fs.writeFile(path.join(__dirname,'/uploads/',dateString+"."+response.type.split("/")[1]), response.data, function(error){
     if(error){
-      res.end('添加失败:'+error);
-    }
-    else
-    {
-      res.setHeader('Content-Type', 'application/json');
-      res.json(sql);
+      throw error;
+    }else{
+      console.log('File created from base64 string!');
+      return true;
     }
   });
+  if(req.body.toText){
+    test(__dirname+'/uploads/'+dateString+"."+response.type.split("/")[1],res);
+  }
 });
 
+async function test(urls,res) {
 
-const client = new vision.ImageAnnotatorClient();
+  const vision = require('@google-cloud/vision');
+
+// Creates a client
+  const client = new vision.ImageAnnotatorClient();
+  const [result] = await client.textDetection(urls);
+  const detections = result.textAnnotations;
+  console.log('Text:');
+  console.log(detections[0].description);
+
+  let translateText ={"text":detections[0].description};
+  fs.unlink(urls,function(err){
+    if(err) throw err;
+
+    console.log('File deleted!');
+  });
+  res.json(translateText);
+}
+
 app.get("/readimage",function(req,res,next){
   client
-      .textDetection('chinese.jpg')
+      .textDetection('2019-10-15-13-14-33.jpeg')
       // Creates a client
       .then(results =>{
-      var final = [];
-  const labels = results[0].textAnnotations;
-  console.log('Labels:');
-  // labels.forEach(function(answer){
-  //         final=answer;
-  // });
-  res.json(labels);
-})
-.catch(err =>{
-    console.error('ERROR:',err);
-})
+        var final = [];
+        const labels = results[0].textAnnotations;
+        console.log('Labels:');
+        // labels.forEach(function(answer){
+        //         final=answer;
+        // });
+        res.json(labels);
+      })
+      .catch(err =>{
+        console.error('ERROR:',err);
+      })
 });
-
 
 
 // catch 404 and forward to error handler
