@@ -3,6 +3,8 @@ var router = express.Router();
 var pdf = require('html-pdf');
 var fs = require('fs');
 var qs = require("querystring");
+var wkhtmltopdf = require('wkhtmltopdf');
+var path = require('path');
 /* GET users listing. */
 router.get('/', function(req, res, next) {
   res.send('respond with a resource');
@@ -209,16 +211,30 @@ router.post('/pdf1',function (req,res,next) {
       console.log(html);
       var pdfOptions = {format: 'Letter'};
 
-      pdf.create(html, pdfOptions).toFile('./note.pdf', function (err, result) {
+      // pdf.create(html, pdfOptions).toFile('./note.pdf', function (err, result) {
+      //   if (err) {
+      //     console.log('error in pdf.create(), err=', err);
+      //     res.send(err);
+      //   } else {
+      //     console.log('result=', result);
+      //     res.setHeader('Content-Type', 'application/pdf');
+      //     res.setHeader('Access-Control-Allow-Origin','*');
+      //     res.download('./note.pdf');
+      //   }
+      // });
+      wkhtmltopdf(html, {output: 'out.pdf'},function (err,result) {
         if (err) {
-          console.log('error in pdf.create(), err=', err);
-          res.send(err);
-        } else {
-          console.log('result=', result);
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Access-Control-Allow-Origin','*');
-          res.download('./note.pdf');
-        }
+              console.log('error in pdf.create(), err=', err);
+              res.send(err);
+            } else {
+              var pdfbase64=new Array();
+              let filePath = path.resolve('./out.pdf');
+              let data = fs.readFileSync(filePath);
+              pdfbase64 = new Buffer.from(data).toString('base64');
+              res.setHeader('Content-Type', 'application/pdf');
+              res.setHeader('Access-Control-Allow-Origin','*');
+              res.json(pdfbase64);
+            }
       });
     }
   });
