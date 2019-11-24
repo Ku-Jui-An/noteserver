@@ -26,6 +26,7 @@
     "phantomjs-prebuilt": "^2.1.16",
     "querystring": "^0.2.0",
     "serve-favicon": "^2.5.0",
-    "silly-datetime": "^0.1.2"
+    "silly-datetime": "^0.1.2",
+    "wkhtmltopdf": "^0.3.4"
   }
 }
