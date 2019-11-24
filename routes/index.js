@@ -151,29 +151,70 @@ router.post('/plus/note',function(req,res,next){
 
 //新增筆記2
 router.post('/plus/note2',function(req,res,next){
-  var db=req.connection;
-
+  var db = req.connection;
+  var label_Array = new Array();
+  var id_Array = new Array();
   var sql = {
     user_id:req.body.user_id,
     title:req.body.title,
+    answer_pic:req.body.answer.picture,
+    question_pic:req.body.question.picture,
+    answer:req.body.answer.text,
+    question:req.body.question.text,
     content:req.body.content,
-    picture1:req.body.picture1,
-    picture2:req.body.picture2,
-    picture3:req.body.picture3,
-    answer:req.body.answer,
-    question:req.body.question
   };
-  console.log(sql);
+  //新增筆記內容
   db.query('INSERT INTO note SET ?',sql,function(error,results,fields){
     if(error){
-      res.end('添加失败:'+error);
+      res.end('筆記添加失败:'+error);
     }
     else
     {
       res.setHeader('Content-Type', 'application/json');
-      res.send('添加成功:'+req.query.title);
+      //res.send('添加成功:'+req.query.title);
     }
   });
+  //搜尋所有標籤名稱(除了自訂標籤以外)
+  for(var i in req.body.label){
+    if(req.body.label[i].level != 8)
+      label_Array[i]=req.body.label[i].name;
+  }
+  var label_selectid='SELECT id FROM label WHERE name in (' + label_Array + ')';
+  db.query(label_selectid,function(err,row){
+     if(err){
+       res.end('標籤搜尋失败:'+error);
+     }
+     else {
+       id_Array = row;
+     }
+  });
+
+  for(var i in req.body.label){
+    if(req.body.label[i].level == 8){
+      var label_sql={
+        name:req.body.label[i].name,
+        level:req.body.label[i].level,
+        user_id:req.body.label[i].user_id
+      };
+      db.query('INSERT INTO label SET ?',label_sql,function(error,results){
+        if(error){
+          res.end('自訂標籤添加失败:'+error);
+        }
+        else {
+          res.setHeader('Content-Type', 'application/json');
+          //res.send('添加成功:'+req.query.title);
+        }
+      });
+    }
+    var mark_insert={
+      label_id:id_Array[i]
+      //note_id:
+    }
+    db.query('INSERT INTO mark SET ?',)
+  }
+  console.log(sql);
+  res.send(test);
+
 });
 
 //新增標籤
