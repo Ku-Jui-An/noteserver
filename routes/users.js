@@ -17,10 +17,10 @@ router.post('/pdf2',function (req,res,next) {
     var answer=new Array();
     var num=0;
     //var b=JSON.parse(a);
-    for(var i in req.body)
+    for(var i in req.body.notedata)
     {
         console.log(i);
-        idArray[num]=req.body['notedata['+ num +'][id]'];
+        idArray[num]=req.body.notedata[num].id;
         num++;
     }
     //console.log(a);
@@ -38,7 +38,7 @@ router.post('/pdf2',function (req,res,next) {
             console.log(question);
             console.log(answer);
 
-            var htmlStart = '<html><body>';
+            var htmlStart = '<html><meta http-equiv="content-type" content="text/html;charset=utf-8"><body>';
             var htmlEnd = '</body></html>';
 
             var htmlquestion = '';
@@ -55,128 +55,42 @@ router.post('/pdf2',function (req,res,next) {
                     + '<h3>' + num2 + '.&nbsp;' + answer[i] + '</h3><br>';
                 num2 += 1;
             }
+            var chinese=''
             var html = htmlStart + htmlquestion + htmlanswer + htmlEnd;
             console.log(html);
             var pdfOptions = {format: 'Letter'};
-
-
-            wkhtmltopdf(html, {output: 'out.pdf'},function (err,result) {
+            var floor = Math.floor(Math.random()*10000000);
+            var pdfname = question[0] + floor + '.pdf';
+            var pdfpath = './Correction-Note/pdf'+ pdfname;
+            wkhtmltopdf(html, {output: pdfpath},function (err,result) {
                 if (err) {
                     console.log('error in pdf.create(), err=', err);
                     res.send(err);
                 }
                 else {
-                    var fileName = "../out.pdf";
-                    var newfileName="out.pdf";
-                    var sourceFile = path.join(__dirname, fileName);
-                    var destPath = path.join(__dirname, "../public", newfileName);
-
-                    fs.rename(sourceFile, destPath, function (err) {
-                        if (err) throw err;
-                        fs.stat(destPath, function (err, stats) {
-                            if (err) throw err;
-                            console.log('stats: ' + JSON.stringify(stats));
-                        });
-                    });
+                    // var fileName = "../out.pdf";
+                    // var newfileName="out.pdf";
+                    // var sourceFile = path.join(__dirname, fileName);
+                    // var destPath = path.join(__dirname, "../public", newfileName);
+                    //
+                    // fs.rename(sourceFile, destPath, function (err) {
+                    //     if (err) throw err;
+                    //     fs.stat(destPath, function (err, stats) {
+                    //         if (err) throw err;
+                    //         console.log('stats: ' + JSON.stringify(stats));
+                    //     });
+                    // });
 
                     console.log("傳送下載連結");
                     res.setHeader('Content-Type', 'application/pdf');
                     res.setHeader('Access-Control-Allow-Origin','*');
-                    res.download("http://localhost:3000/out.pdf");
+                    res.send("http://35.206.219.27/pdf/"+pdfname);
                 }
             });
         }
     });
 });
 
-//
-// router.route('/pdf3')
-//     .post(function (req,res,next) {
-//       var db=req.connection;
-//       var idArray= new Array();
-//       var a=JSON.stringify(req.body);
-//       var question=new Array();
-//       var answer=new Array();
-//       //var b=JSON.parse(a);
-//       idArray=a.split('"');
-//       for(var i in idArray)
-//          idArray.splice(i,1);
-//       for(var i in idArray)
-//          idArray.splice(i,1);
-//       console.log(a);
-//       console.log(idArray);
-//       var sql='SELECT question,answer from note where id in ('+ idArray +')';
-//       db.query(sql,function(err,row){
-//         if(err)
-//           console.log("錯誤警告" + err);
-//         else {
-//           for(var i in row){
-//             question[i] = row[i].question;
-//             answer[i] = row[i].answer;
-//           }
-//           console.log(question);
-//           console.log(answer);
-//           //res.json(question+answer);
-//           next();
-//         }
-//       });
-//     })
-//     .post(function(req,res,next){
-//         var htmlStart = '<html><body>';
-//         var htmlEnd = '</body></html>';
-//
-//         var htmlContent = '';
-//         var num=1;
-//         for(var i in question){
-//           htmlContent += '<hr>'
-//               + '<h3>' + num + '.&nbsp;' + question[i] + '</h3><p>';
-//           console.log("問題: "+question[i]);
-//           num += 1;
-//         }
-//         var html = htmlStart + htmlContent + htmlEnd;
-//         console.log(html);
-//         var pdfOptions = {format: 'Letter'};
-//
-//         pdf.create(html, pdfOptions).toFile('./note.pdf', function(err, result){
-//           if(err){
-//             console.log('error in pdf.create(), err=', err);
-//             res.send(err);
-//           }
-//           else{
-//             console.log('result=', result);
-//             res.send('success');
-//           }
-//         });
-//     });
-// router.post('/pdf1',function (req,res,next) {
-//   // var json = fs.readFileSync('C:\\Users\\user\\IdeaProjects\\note-server\\bookstore.json', 'utf8');
-//   // var obj = JSON.parse(json);
-//   var htmlStart = '<html><body>';
-//   var htmlEnd = '</body></html>';
-//
-//   var htmlContent = '';
-//   var num=1;
-//   for(var i in question){
-//     htmlContent += '<hr>'
-//         + '<h3>' + num + '.&nbsp;' + question[i] + '</h3><p>';
-//     console.log("問題: "+question[i]);
-//     num += 1;
-//   }
-//   var html = htmlStart + htmlContent + htmlEnd;
-//   console.log(html);
-//   var pdfOptions = {format: 'Letter'};
-//
-//   pdf.create(html, pdfOptions).toFile('./note.pdf', function(err, result){
-//     if(err){
-//       console.log('error in pdf.create(), err=', err);
-//       res.send(err);
-//     }
-//     else{
-//       console.log('result=', result);
-//       res.send('success');
-//     }
-//   });
-// });
 
 router.post('/pdf1',function (req,res,next) {
   var db=req.connection;
@@ -230,17 +144,7 @@ router.post('/pdf1',function (req,res,next) {
       console.log(html);
       var pdfOptions = {format: 'Letter'};
 
-      // pdf.create(html, pdfOptions).toFile('./note.pdf', function (err, result) {
-      //   if (err) {
-      //     console.log('error in pdf.create(), err=', err);
-      //     res.send(err);
-      //   } else {
-      //     console.log('result=', result);
-      //     res.setHeader('Content-Type', 'application/pdf');
-      //     res.setHeader('Access-Control-Allow-Origin','*');
-      //     res.download('./note.pdf');
-      //   }
-      // });
+
       wkhtmltopdf(html, {output: 'out.pdf'},function (err,result) {
         if (err) {
               console.log('error in pdf.create(), err=', err);

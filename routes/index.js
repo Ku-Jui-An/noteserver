@@ -1,6 +1,8 @@
 var express = require('express');
 var router = express.Router();
 var sd = require('silly-datetime');
+var fs = require('fs');
+var path = require('path');
 //-------------------------------------------搜尋------------------------------------------------------
 //:note 輸入欲搜尋的表單
 router.get('/select/:note',function(request,response,next){
@@ -148,12 +150,17 @@ router.post('/plus/note',function(req,res,next){
     }
   });
 });
+router.post('/test',function(req,res){
+   uploads(req.body.answer.picture,res);
+});
 
 //新增筆記2
 router.post('/plus/note2',function(req,res,next){
   var db = req.connection;
-  var label_Array = new Array();
   var id_Array = new Array();
+  var noteid;
+  var count=0;
+  var count2=0;
   var sql = {
     user_id:req.body.user_id,
     title:req.body.title,
@@ -170,60 +177,126 @@ router.post('/plus/note2',function(req,res,next){
     }
     else
     {
-      res.setHeader('Content-Type', 'application/json');
-      //res.send('添加成功:'+req.query.title);
+      noteid = results.insertId;
+      console.log(noteid);
+      for(var i in req.body.label){
+          var sql="SELECT id FROM label WHERE name = '"+req.body.label[i].name +"'";
+          console.log(sql);
+          var x;
+          db.query(sql,function(err,rows) {
+              if(err){
+                  console.log(err)
+              }
+              else{
+                  console.log(rows);
+                  if(rows[0] != null)
+                      x=new Boolean(true);
+                  else
+                      x = new Boolean(false);
+                  if(x==false){
+                      console.log('我是if ' + count );
+                      var label_sql={
+                          name:req.body.label[count].name,
+                          level:req.body.label[count].level,
+                          user_id:req.body.user_id
+                      };
+                      console.log(label_sql);
+                      db.query('INSERT INTO label SET ?',label_sql,function(error,results){
+                          if(error){
+                              res.end('自訂標籤添加失败:'+error);
+                          }
+                          else {
+                              var newlabel_id=results.insertId;
+                              console.log('自訂標籤成功');
+                              var mark_insert = {
+                                  label_id: newlabel_id,
+                                  note_id: noteid
+                              };
+                              console.log(mark_insert);
+                              console.log("開始relation "+ count2);
+                              id_Array[count2]=newlabel_id;
+                              var label_relationship={
+                                  note_id:noteid,
+                                  child_id:newlabel_id,
+                                  child_name:req.body.label[count2].name,
+                                  father_id:id_Array[count2-1],
+                                  father_name:req.body.label[count2-1].name
+                              };
+                              console.log(label_relationship);
+                              count2+=1;
+                              db.query('INSERT INTO label_relation SET ?',label_relationship,function(err,row) {
+                                  if(err) {
+                                      res.end('標籤關係添加失败:'+err);
+                                  }
+                                  else {
+                                      console.log("標籤關係新增成功")
+                                  }
+                              });
+                              db.query('INSERT INTO mark SET ?', mark_insert, function (err, row) {
+                                  if (err) {
+                                      res.end('mark添加失败:' + err);
+                                  } else {
+                                      console.log("mark新增成功");
+                                  }
+                              });
+                          }
+                      });
+                      count+=1;
+                  }
+                  else {
+                      console.log('我是else ' + count);
+                      id_Array[count] = rows[0].id;
+                      var mark_insert = {
+                          label_id: rows[0].id,
+                          note_id: noteid
+                      };
+                      console.log(mark_insert);
+                      console.log("level: " + req.body.label[count].level);
+                      if(req.body.label[count].level>=2){
+                          var label_relationship = {
+                              note_id: noteid,
+                              child_id: id_Array[count],
+                              child_name: req.body.label[count].name,
+                              father_id: id_Array[count-1],
+                              father_name: req.body.label[count - 1].name
+                          };
+                          console.log(label_relationship);
+                          db.query('INSERT INTO label_relation SET ?', label_relationship, function (err, row) {
+                              if (err) {
+                                  res.end('標籤關係添加失败:' + err);
+                              } else {
+                                  console.log("標籤關係新增成功")
+                              }
+                          });
+                      }
+                      db.query('INSERT INTO mark SET ?', mark_insert, function (err, row) {
+                          if (err) {
+                              res.end('mark添加失败:' + err);
+                          } else {
+                              console.log("mark新增成功");
+                          }
+                      });
+                      count += 1;
+                      count2 += 1;
+                  }
+              }
+          });
+      }
     }
+      res.json(noteid);
   });
-  //搜尋所有標籤名稱(除了自訂標籤以外)
-  for(var i in req.body.label){
-    if(req.body.label[i].level != 8)
-      label_Array[i]=req.body.label[i].name;
-  }
-  var label_selectid='SELECT id FROM label WHERE name in (' + label_Array + ')';
-  db.query(label_selectid,function(err,row){
-     if(err){
-       res.end('標籤搜尋失败:'+error);
-     }
-     else {
-       id_Array = row;
-     }
-  });
-
-  for(var i in req.body.label){
-    if(req.body.label[i].level == 8){
-      var label_sql={
-        name:req.body.label[i].name,
-        level:req.body.label[i].level,
-        user_id:req.body.label[i].user_id
-      };
-      db.query('INSERT INTO label SET ?',label_sql,function(error,results){
-        if(error){
-          res.end('自訂標籤添加失败:'+error);
-        }
-        else {
-          res.setHeader('Content-Type', 'application/json');
-          //res.send('添加成功:'+req.query.title);
-        }
-      });
-    }
-    var mark_insert={
-      label_id:id_Array[i]
-      //note_id:
-    }
-    db.query('INSERT INTO mark SET ?',)
-  }
-  console.log(sql);
-  res.send(test);
 
 });
+
 
 //新增標籤
 router.post('/plus/label',function(req,res,next){
   var db=req.connection;
 
   var sql = {
-    type:req.query.type,
-    name:req.query.name
+    name:req.body.name,
+    level:req.body.level,
+    user_id:1
   };
   db.query('INSERT INTO label SET ?',sql,function(error,results,fields){
     if(error){
@@ -232,7 +305,9 @@ router.post('/plus/label',function(req,res,next){
     else
     {
       res.setHeader('Content-Type', 'application/json');
-      res.send('添加成功:'+ req.query.name);
+      console.log(results);
+      console.log(results.insertId);
+      res.send(results);
     }
   });
 });
@@ -289,7 +364,7 @@ router.post('/update/useracc/:account', function(req, res, next) {
   var account = req.params.account;
 
   var sql = {
-    password:req.query.password
+    password:req.body.password
   };
   var qur = db.query('UPDATE user SET ? WHERE account = ?', [sql, account], function(err, rows) {
     if (err) {
@@ -403,40 +478,53 @@ router.post('/update/mark/:id', function(req, res, next) {
 router.get('/delete/note/:id', function(req, res, next) {
   var id = req.params.id;
   var db = req.connection;
-  var sql1 = 'DELETE FROM  mark  WHERE note_id = ' + id
-  var sql2 = 'DELETE FROM  note  WHERE id = ' + id
+  var sql1 = 'DELETE FROM  label_relation WHERE note_id =' + id;
+  var sql2 = 'DELETE FROM  mark  WHERE note_id = ' + id;
+  var sql3 = 'DELETE FROM  note  WHERE id = ' + id;
   db.query(sql1, function(err, rows) {
-
-    db.query(sql2, function(err,rows){
-      if (err) {
-        console.log(err);
-        res.end('刪除失敗');
-      }
-      res.send('刪除成功');
-    });
-
-    // res.redirect('/');
+    if(err){
+      console.log("刪除標籤關係失敗"+err);
+      res.end('刪除失敗')
+    }
+    else{
+      db.query(sql2, function(err,rows){
+        if (err) {
+          console.log("刪除MARK失敗"+err);
+          res.end('刪除失敗');
+        }
+        else{
+          db.query(sql3,function(err,rows) {
+            if (err) {
+              console.log("刪除筆記失敗" + err);
+              res.end('刪除失敗');
+            }
+            else{
+              res.send('刪除成功');
+            }
+          });
+        }
+      });
+    }
   });
 });
 
 router.get('/delete/user/:id', function(req, res, next) {
   var id = req.params.id;
   var db = req.connection;
-  // var sql1='SELECT id FROM note WHERE user_id = ' + id
-  var sql3='DELETE FROM note WHERE user_id =' + id
-  var sql4='DELETE FROM user WHERE id = ' + id
-  var sql2='DELETE FROM mark WHERE user_id = ' + id
-  db.query(sql2, function(err, rows) {
-
-    db.query(sql3, function(err, rows) {
-
-      db.query(sql4, function(err, rows) {
-
-        if (err) {
-          console.log(err);
-          res.end('刪除失敗');
-        }
-        res.send("刪除成功");
+  var sql1='DELETE FROM  label_relation WHERE child_id IN (SELECT label_id FROM mark WHERE note_id IN (SELECT id FROM note WHERE user_id='+ id +')) OR father_id IN ( SELECT label_id FROM mark WHERE note_id IN (SELECT id FROM note WHERE user_id='+ id +')';
+  var sql3='DELETE FROM note WHERE user_id =' + id;
+  var sql4='DELETE FROM user WHERE id = ' + id;
+  var sql2='DELETE FROM mark WHERE note_id IN (SELECT id FROM note WHERE user_id='+ id +')';
+  db.query(sql1,function(err,rows){
+    db.query(sql2, function(err, rows) {
+      db.query(sql3, function(err, rows) {
+        db.query(sql4, function(err, rows) {
+          if (err) {
+            console.log(err);
+            res.end('刪除失敗');
+          }
+            res.send("刪除成功");
+        });
       });
     });
   });
@@ -468,6 +556,21 @@ router.get('/delete/mark/:id', function(req, res, next) {
   db.query(sql1, function(err, rows) {
 
 
+    if (err) {
+      console.log(err);
+      res.end('刪除失敗');
+    }
+    res.send('刪除成功');
+
+    // res.redirect('/');
+  });
+});
+
+router.get('/delete/labelre/:id', function(req, res, next) {
+  var id = req.params.id;
+  var db = req.connection;
+  var sql1 = 'DELETE FROM  label_relation  WHERE id = ' + id
+  db.query(sql1, function(err, rows) {
     if (err) {
       console.log(err);
       res.end('刪除失敗');
