@@ -55,13 +55,12 @@ router.post('/pdf2',function (req,res,next) {
                     + '<h3>' + num2 + '.&nbsp;' + answer[i] + '</h3><br>';
                 num2 += 1;
             }
-            var chinese=''
             var html = htmlStart + htmlquestion + htmlanswer + htmlEnd;
             console.log(html);
             var pdfOptions = {format: 'Letter'};
             var floor = Math.floor(Math.random()*10000000);
             var pdfname = question[0] + floor + '.pdf';
-            var pdfpath = './Correction-Note/pdf'+ pdfname;
+            var pdfpath = './Correction-Note/pdf/'+ pdfname;
             wkhtmltopdf(html, {output: pdfpath},function (err,result) {
                 if (err) {
                     console.log('error in pdf.create(), err=', err);
@@ -82,9 +81,9 @@ router.post('/pdf2',function (req,res,next) {
                     // });
 
                     console.log("傳送下載連結");
-                    res.setHeader('Content-Type', 'application/pdf');
-                    res.setHeader('Access-Control-Allow-Origin','*');
-                    res.send("http://35.206.219.27/pdf/"+pdfname);
+                    //res.setHeader('Content-Type', 'application/pdf');
+                    //res.setHeader('Access-Control-Allow-Origin','*');
+                    res.json("http://35.206.219.27/pdf/"+pdfname);
                 }
             });
         }
