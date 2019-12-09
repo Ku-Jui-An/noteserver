@@ -43,9 +43,9 @@ function handleDisconnection() {
       throw err;
     }
   });
-};
+}
 
-handleDisconnection()
+handleDisconnection();
 
 
 app.use(logger('dev'));
@@ -97,7 +97,6 @@ let query = function (sql) {
         reject(err)
       } else {
         connection.query(sql, (err, rows) => {
-
           if (err) {
             reject(err)
           } else {
@@ -114,7 +113,7 @@ module.exports = query;
 
 //單圖上傳
 //upload.single('file')的file盡量跟<input>的name一致
-app.post('/uploads', function (req, res, next) {
+app.post('/uploads',async function (req, res, next) {
   let data_url = req.body.baseimg;
   //var buff = new Buffer.from(data_url.replace(/^data:image\/(png|gif|jpeg);base64,/,''), 'base64');
 
@@ -152,6 +151,7 @@ app.post('/uploads', function (req, res, next) {
       }
     }
     console.log(sqldata);
+    await check_pic(picmark,noteid);
     var sql = "UPDATE note SET ? WHERE id = ?";
     connection.query(sql,[sqldata,noteid],function(err,rows){
       if(err)
@@ -161,7 +161,6 @@ app.post('/uploads', function (req, res, next) {
     });
   }
 });
-
 async function test(urls,res) {
   const vision = require('@google-cloud/vision');
 // Creates a client
@@ -180,57 +179,112 @@ async function test(urls,res) {
   res.json(translateText);
 }
 
+async function check_pic(picmark,noteid){
+    console.log("184: "+ picmark);
+    console.log("185: "+ noteid);
+    let sql;
+    let picurl;
+    let picname = new Array();
+    if(picmark=="answer")
+       sql="SELECT answer_pic FROM note WHERE id =" + noteid;
+    else if(picmark=="question")
+       sql="SELECT question_pic FROM note WHERE id =" + noteid;
+    console.log("190: " + sql);
+    await new Promise((resolve)=> {
+        connection.query(sql,function(err,rows){
+            if(err){
+                console.log("圖片搜尋失敗: " + err);
+                resolve(1);
+            }
+            else{
+                if(rows!=null){
+                    if(picmark="answer")
+                        picurl=rows[0].answer_pic;
+                    else if(picmark="question")
+                        picurl=rows[0].question_pic;
+                    picname=picurl.split("/");
+                    fs.unlink("./Correction-Note/images/"+picname[4], function (err) {
+                        if(err)
+                            console.log("刪除檔案失敗: "+ err);
+                        else
+                            console.log('已經刪除檔案!');
+                    });
+                }
+                resolve(0);
+            }
+        });
+    });
+    return "success";
+}
+app.post('/test1',async function(req,res) {
+    var picmark = req.body.mark;
+    var noteid = req.body.id;
+    await check_pic(picmark,noteid);
+    res.send("hello");
+
+});
 app.post('/getNote', async function (req, res, next) {
-  var range = 10;
-  var sql2 = 'Select * From note where user_id=' + req.body.id + ' ORDER BY id DESC Limit ' + req.body.floor + ',' + range;
-  var sql3 ='SELECT COUNT(*) as total FROM note where user_id = '+ req.body.id;
-  let sql;
-  let notId;
-  let returnMainData = [];
-  let max;
-  let maxsql = await query(sql3);
-  maxsql.forEach(async function(index,value) {
-    max = index.total;
-  });
-  returnMainData["main"] = {};
-  let rows = await query(sql2);
-  rows.forEach(async function (index, value) {
-    let name = "data" + value;
-    returnMainData["main"][name];
-    returnMainData["main"][name] = {
-      "id": index.id,
-      "title": index.title,
-      "content": index.content
+    var sql = {
+        user_id: req.body.id
     };
-    notId = index.id;
-  });
-  console.log(notId);
-  let name = "";
-  sql2="select * from mark where note_id="+ notId;
-  rows = await query(sql2);
+    let notId = [];
+    let returnMainData = [];
+    let data = returnMainData;
+    let i = 0;
+    returnMainData["main"] = {};
 
-  rows.forEach(async function (index, value) {
-    sql = rows[value].label_id;
+    let rows = await query("select * from note where ?", sql);
+    rows.forEach(async function (index, value) {
+        let name = index.id;
+        returnMainData["main"][name];
+        returnMainData["main"][name] = {
+            "id": index.id,
+            "title": index.title,
+            "content": index.content,
+            "tag": []
+        };
+        notId.push(index.id);
+        sql = [];
+        notId.forEach(async function (index, value) {
+            sql.push({
+                note_id: notId[value]
+            });
+        });
+        await sql;
+        let counter = sql.length - 1;
 
-    name = "data" + value;
-    returnMainData["main"][name]["tag"] = [];
-  });
-  console.log("tagid="+sql);
-  sql2 ="select name from label where id="+sql;
-  rows = await query(sql2);
+        sql.forEach(async function (a1, b1) {
 
-  rows.forEach(async function (index, value) {
-    console.log(rows.length)
-    console.log(value)
-    returnMainData["main"][name]["tag"].push(rows[value].name);
-  });
-  res.json({
-    max:max,
-    note:returnMainData["main"]
-  });
+            rows = await query("select * from mark where ?", sql[b1])
+            sql = [];
+            rows.forEach(async function (index, value) {
+                sql.push({
+                    id: rows[value].label_id
+                });
 
-  const data = await returnMainData;
+            });
+            await sql;
+            let counter2 = sql.length - 1;
+            sql.forEach(async function (a2, b2) {
+                rows = await query("select name from label where ?", a2)
+                await rows;
+                let counter3 = rows.length - 1;
+                rows.forEach(async function (index, value) {
 
+                    if (returnMainData["main"][a1.note_id].tag.indexOf(rows[value].name)) {
+                        returnMainData["main"][a1.note_id].tag.push(rows[value].name);
+                    }
+                    data = await returnMainData;
+                    if (counter == b1 && counter2 == b2 && value == counter3 && i == 0) {
+                        res.json(returnMainData["main"]);
+                        i = 1;
+                    }
+
+                })
+            });
+        })
+    });
+    await rows
 });
 
 
