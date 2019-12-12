@@ -9,7 +9,6 @@ var app = express();
 var formidable = require('formidable');
 var sd = require('silly-datetime');
 var multer1  = require('multer');
-var pdf = require('html-pdf');
 var fs = require('fs');
 
 var routes = require('./routes/index');
@@ -51,7 +50,7 @@ handleDisconnection();
 app.use(logger('dev'));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'Correction-Note')));
-app.use(bodyParser.json({limit:"2100000kb"}));
+app.use(bodyParser.json({limit:"20mb"}));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/',login);
 
@@ -90,23 +89,23 @@ const pool = mysql.createPool({
   database: 'Notebook'
 });
 
-let query = function (sql) {
-  return new Promise((resolve, reject) => {
-    pool.getConnection(function (err, connection) {
-      if (err) {
-        reject(err)
-      } else {
-        connection.query(sql, (err, rows) => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve(rows)
-          }
-          connection.release()
+let query = function (sql, values) {
+    return new Promise((resolve, reject) => {
+        pool.getConnection(function (err, connection) {
+            if (err) {
+                reject(err)
+            } else {
+                connection.query(sql, values, (err, rows) => {
+                    if (err) {
+                        reject(err)
+                    } else {
+                        resolve(rows)
+                    }
+                    connection.release()
+                })
+            }
         })
-      }
     })
-  })
 };
 
 module.exports = query;
@@ -227,23 +226,40 @@ app.post('/getNote', async function (req, res, next) {
     var sql = {
         user_id: req.body.id
     };
+    let floor=req.body.floor;
+    let range=10;
     let notId = [];
     let returnMainData = [];
     let data = returnMainData;
     let i = 0;
+    let r=0;
+    let x = new Array();
     returnMainData["main"] = {};
-
-    let rows = await query("select * from note where ?", sql);
+    let sql2 = 'Select * From note where ? ORDER BY id DESC Limit '+ floor + ',' + range;
+    let sql3='SELECT COUNT(*) as total FROM note where ?';
+    let rows=await query(sql3,sql);
+    rows.forEach(async function(index,value) {
+       returnMainData['main']['Max']={
+           MAX:index.total
+       };
+       x[0]=returnMainData['main']['Max'];
+    });
+    rows = await query(sql2, sql);
     rows.forEach(async function (index, value) {
         let name = index.id;
+        //console.log(name);
         returnMainData["main"][name];
         returnMainData["main"][name] = {
             "id": index.id,
             "title": index.title,
             "content": index.content,
+            "question_pic":index.question_pic,
             "tag": []
         };
+        r++;
+        console.log(returnMainData["main"][150]);
         notId.push(index.id);
+        //console.log(notId)
         sql = [];
         notId.forEach(async function (index, value) {
             sql.push({
@@ -254,8 +270,8 @@ app.post('/getNote', async function (req, res, next) {
         let counter = sql.length - 1;
 
         sql.forEach(async function (a1, b1) {
-
-            rows = await query("select * from mark where ?", sql[b1])
+            //console.log(b1);
+            rows = await query("select * from mark where ?", sql[b1]);
             sql = [];
             rows.forEach(async function (index, value) {
                 sql.push({
@@ -276,17 +292,24 @@ app.post('/getNote', async function (req, res, next) {
                     }
                     data = await returnMainData;
                     if (counter == b1 && counter2 == b2 && value == counter3 && i == 0) {
-                        res.json(returnMainData["main"]);
+                        console.log(r);
+                        for(let y=1,z=0;y<=r;y++,z++) {
+                            console.log(returnMainData["main"][notId[z]]);
+                            x[y]=returnMainData["main"][notId[z]];
+                        }
+                        res.json(x);
                         i = 1;
                     }
 
                 })
+
+
             });
         })
     });
     await rows
+    // console.log(returnMainData["main"]["34"].tag);
 });
-
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
