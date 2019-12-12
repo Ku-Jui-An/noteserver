@@ -62,7 +62,7 @@ router.get('/uid/:uid',function(request,response,next){
 });
 
 //搜尋單筆筆記資料
-router.get('/note',function(req,res){
+router.post('/note',function(req,res){
     var db =req.connection;
     var id=req.body.id;
     var sql="select * from note where id = "+ id;
@@ -101,6 +101,79 @@ router.get('/note',function(req,res){
     });
 });
 
+//筆記搜尋
+router.post('/note/select',async function(req,res) {
+   let db=req.connection;
+   let st_word=req.body.word;
+   let user_id=req.body.userid;
+   let word=new Array();
+   word=await selectnote(db,st_word,user_id);
+
+
+
+});
+async function selectnote(db,word,id){
+    let noteid = new Array();
+    let count = 0;
+    let sql="SELECT * FROM note WHERE user_id="+id+" AND(title like "+"'%"+word+"%'"+" or answer like "+"'%"+word+"%'"+" or question like "+"'%"+word+"%')";
+    await new Promise((resolve)=> {
+        db.query(sql, function (err, rows) {
+            if (err)
+                console.log("114: " + err);
+            else {
+                console.log("搜尋成功");
+                for (let i in rows) {
+                    noteid[count] = rows[count];
+                    count++;
+                }
+                resolve(1);
+            }
+        });
+    });
+    return noteid;
+}
+async function selectlabel(db,word,id){
+    let noteid = new Array();
+    let note_result = new Array();
+    let count = 0;
+    let count1= 0;
+    let sql1="SELECT note_id FROM mark WHERE label_id in (SELECT id FROM label WHERE name like "+"'%" +word+"%')";
+    let sql2="SELECT * FROM note WHERE id in("+ noteid+")";
+    await new Promise((resolve)=> {
+        db.query(sql1, function (err, rows) {
+            if (err)
+                console.log("114: " + err);
+            else {
+                console.log("搜尋成功");
+                for (let i in rows) {
+                    noteid[count] = rows[count].note_id;
+                    count++;
+                }
+                resolve(1);
+            }
+        });
+    });
+    await new Promise((resolve)=> {
+        db.query(sql2, function (err, rows) {
+            if (err)
+                console.log("157: " + err);
+            else {
+                console.log("搜尋成功");
+                for(let i in rows){
+                    note_result[count1]=rows[count1];
+                    count1++;
+                }
+                resolve(1);
+            }
+        });
+    });
+    for(let x;x<note_result.length;x++)
+    {
+        //if(note_result[x].user_id != id)
+
+    }
+    return noteid;
+}
 //-------------------------------------------新增------------------------------------------------------
 
 //新增使用者

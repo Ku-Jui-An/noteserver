@@ -1,6 +1,5 @@
 var express = require('express');
 var router = express.Router();
-var pdf = require('html-pdf');
 var fs = require('fs');
 var qs = require("querystring");
 var wkhtmltopdf = require('wkhtmltopdf');
