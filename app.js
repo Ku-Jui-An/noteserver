@@ -125,7 +125,7 @@ app.post('/uploads',async function (req, res, next) {
   response.data = new Buffer.from(matches[2], 'base64');
   console.log(dateString);
   let picname = dateString + "." + response.type.split("/")[1];
-  fs.writeFile(path.join(__dirname, '/Correction-Note/images', picname), response.data, function (error) {
+  fs.writeFile(path.join(__dirname, '/Correction-Note/images/', picname), response.data, function (error) {
     if (error) {
       throw error;
     } else {
@@ -134,7 +134,7 @@ app.post('/uploads',async function (req, res, next) {
     }
   });
   if (req.body.toText) {
-    test(__dirname + '/Correction-Note/images' + dateString + "." + response.type.split("/")[1], res);
+    test(__dirname + '/Correction-Note/images/' + dateString + "." + response.type.split("/")[1], res);
   }
   else{
     var picmark = req.body.mark;
