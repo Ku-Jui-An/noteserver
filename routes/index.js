@@ -101,44 +101,89 @@ router.post('/note',function(req,res){
     });
 });
 
+async function selectnote(db,a){
+    let test_array=new Array();
+    let sql="select * from note where id= "+ a;
+    await new Promise((resolve)=> {
+        db.query(sql, function (err, rows) {
+            test_array = rows;
+            console.log("474: " + rows);
+            console.log("474: " + test_array);
+            resolve(1);
+        });
+    });
+    //test_array=[{科目:"國文"},{科目:"英文"},{科目:"數學"},{科目:"社會"},{科目:"自然"}];
+    console.log(test_array);
+    return test_array;
+}
+async function test(){
+    let test_array=new Array();
+    // test_array=["國文","英文","數學","社會","自然"];
+    for(let i=0;i<5;i++)
+        test_array[i]=i;
+    console.log(test_array);
+    test_array.splice(2,1);
+    console.log(test_array);
+    return test_array;
+}
+router.get('/test/:id',async function(req,res){
+    var db=req.connection;
+    var id=req.params.id;
+    let result = new Array();
+    result = await test();
+    console.log(result);
+    res.json(result);
+});
 //筆記搜尋
 router.post('/note/select',async function(req,res) {
    let db=req.connection;
    let st_word=req.body.word;
    let user_id=req.body.userid;
-   let word=new Array();
-   word=await selectnote(db,st_word,user_id);
-
-
-
+   let word1=new Array();
+   let word2=new Array();
+   word1=await select_note(db,st_word,user_id);
+   word2=await select1_label(db,st_word,user_id);
+   console.log("word1: "+word1);
+   console.log("word2: "+word2);
+   for(let i = 0; i < word1.length; i++){
+       for(let j = 0; j < word2.length; j++){
+           if(word1[i]==word2[j]){
+               word2.splice(0,1);
+           }
+       }
+   }
+   for(let j = 0; j < word2.length; j++)
+       word1.push(word2[j]);
+   let a=await select_result(db,word1);
+   res.json(a);
 });
-async function selectnote(db,word,id){
-    let noteid = new Array();
+async function select_note(db,word,id){
+    let note_result = new Array();
     let count = 0;
-    let sql="SELECT * FROM note WHERE user_id="+id+" AND(title like "+"'%"+word+"%'"+" or answer like "+"'%"+word+"%'"+" or question like "+"'%"+word+"%')";
+    let sql="SELECT id FROM note WHERE user_id="+id+" AND(title like "+"'%"+word+"%'"+" or answer like "+"'%"+word+"%'"+" or question like "+"'%"+word+"%')";
     await new Promise((resolve)=> {
         db.query(sql, function (err, rows) {
             if (err)
                 console.log("114: " + err);
             else {
                 console.log("搜尋成功");
-                for (let i in rows) {
-                    noteid[count] = rows[count];
+                for(let i in rows){
+                    note_result[count] = rows[count].id;
                     count++;
                 }
                 resolve(1);
             }
         });
     });
-    return noteid;
+    console.log("144: "+ note_result[0]);
+    return note_result;
 }
-async function selectlabel(db,word,id){
-    let noteid = new Array();
-    let note_result = new Array();
+async function select1_label(db,word,id){
+    let note_id = new Array();
+    let note_result = [];
     let count = 0;
     let count1= 0;
     let sql1="SELECT note_id FROM mark WHERE label_id in (SELECT id FROM label WHERE name like "+"'%" +word+"%')";
-    let sql2="SELECT * FROM note WHERE id in("+ noteid+")";
     await new Promise((resolve)=> {
         db.query(sql1, function (err, rows) {
             if (err)
@@ -146,13 +191,15 @@ async function selectlabel(db,word,id){
             else {
                 console.log("搜尋成功");
                 for (let i in rows) {
-                    noteid[count] = rows[count].note_id;
+                    note_id[count] = rows[count].note_id;
                     count++;
                 }
                 resolve(1);
             }
         });
     });
+    console.log("167: "+ note_id);
+    let sql2="SELECT id FROM note WHERE user_id ="+ id +" AND id in("+ note_id+")";
     await new Promise((resolve)=> {
         db.query(sql2, function (err, rows) {
             if (err)
@@ -160,19 +207,72 @@ async function selectlabel(db,word,id){
             else {
                 console.log("搜尋成功");
                 for(let i in rows){
-                    note_result[count1]=rows[count1];
+                    note_result[count1]=rows[count1].id;
                     count1++;
                 }
                 resolve(1);
             }
         });
     });
-    for(let x;x<note_result.length;x++)
-    {
-        //if(note_result[x].user_id != id)
-
-    }
-    return noteid;
+    console.log("189: "+note_result);
+    return note_result;
+}
+async function select_result(db,note_id){
+    let data1=[];
+    let note_data=[];
+    data1["main"]={};
+    let sql="SELECT * FROM note WHERE id in("+note_id+")";
+    let count2=0;
+    console.log(note_id);
+    await new Promise((resolve)=> {
+      db.query(sql,function(err,rows) {
+        if(err)
+            console.log("162: "+err);
+        else{
+           note_data=rows;
+           resolve(1);
+        }
+      });
+    });
+    console.log(note_data);
+    await new Promise((resolve)=>{
+        for(let a=0;a<note_data.length;a++){
+            // var sql=[];
+            // sql[a]={
+            //     note_id:note_id[a]
+            // };
+            var sql={
+                   note_id:note_id[a]
+            };
+            let sql2="select * from label where id in(select label_id from mark where ?)";
+            console.log(sql);
+            db.query(sql2,sql,function(err,rows) {
+                if(err)
+                    console.log("171: "+err);
+                else{
+                    let tag=new Array();
+                    for(let b=0;b<rows.length;b++){
+                        tag[b]=rows[b].name;
+                    }
+                    console.log(tag);
+                    let labelname=note_data[a].id;
+                    console.log(note_data[a].id);
+                    data1["main"][labelname];
+                    data1["main"][labelname]= {
+                        "id": note_data[a].id,
+                        "title": note_data[a].title,
+                        "content": note_data[a].content,
+                        "question_pic": note_data[a].question_pic,
+                        "tag": tag
+                    };
+                    console.log(data1["main"]);
+                    if(a==note_data.length-1)
+                        resolve(1);
+                }
+            });
+        }
+    });
+    return(data1["main"]);
 }
 //-------------------------------------------新增------------------------------------------------------
 
@@ -442,28 +542,7 @@ router.post('/update/usertime/:account', function(req, res, next) {
   });
 });
 
-async function selectnote(db,a){
-    //var db=a.connection;
-    console.log(a);
-    var result;
-    var sql="SELECT * FROM mark WHERE note_id =" + a;
-    await new Promise((resolve)=>{
-        db.query(sql,function(err,rows){
-            console.log(rows.length);
-            result=rows;
-            resolve(rows);
-        });
-    });
-    console.log(result);
-    return result;
-}
 
-router.get('/test/:id',async function(req,res){
-    var db=req.connection;
-    var id=req.params.id;
-    var result = await selectnote(db,id);
-    res.json(result);
-});
 async function select_label(db,label)
 {
     var answer;
